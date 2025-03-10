@@ -30,6 +30,9 @@ import seaborn as sns
 from sklearn import metrics
 from matplotlib import pyplot as plt
 import os
+import traceback
+import neptune.new as neptune
+
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -76,6 +79,20 @@ def modeltrain(tp, EPOCH, LR, test_ratio, start, end, ncls, psize, depth, heads,
     early_stopping = EarlyStopping(patience=30, delta=1e-4, path=store_path, verbose=False)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', factor=0.5, verbose=1, eps=1e-07,
                                                            patience=10)
+    
+    run = neptune.init_run(
+    project="Phd-lgilman/1stpaperdomaingeneralisation",
+    api_token="eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiJiZjRmNDhlZi01MDgyLTRiYTMtOWI1NS0zZTg4NzdlYzY4NjIifQ==",
+    )  # your credentials
+
+    # Log dataset information to Neptune
+    run["dataset/name"] = tp
+    run["dataset/train_size"] = len(data_train)
+    run["dataset/test_size"] = len(data_test)
+    run["dataset/test_ratio"] = test_ratio
+    run["dataset/start"] = start
+    run["dataset/end"] = end
+
     print("This is VitRun")
     print("Start Training!")  # 定义遍历数据集的次数
 
@@ -105,8 +122,16 @@ def modeltrain(tp, EPOCH, LR, test_ratio, start, end, ncls, psize, depth, heads,
                         acc = accuracy_score(label, y_predicted)
                         print(f"Batch {i+1}: Loss = {loss.item()}, Acc = {acc}")
                         sum_loss.append(loss.item())
+                        
+                        # Log batch metrics to Neptune
+                        run["train/batch/loss"].log(loss.item())
+                        run["train/batch/accuracy"].log(acc)
+                        
                     avg_loss = np.mean(sum_loss)
                     print(f"Epoch {epoch+1} completed. Avg Loss = {avg_loss}")
+                    
+                    # Log epoch metrics to Neptune
+                    run["train/epoch/loss"].log(avg_loss)
 
                     with torch.no_grad():  # 无梯度
                         test_loss = []
@@ -123,19 +148,25 @@ def modeltrain(tp, EPOCH, LR, test_ratio, start, end, ncls, psize, depth, heads,
                             acc = accuracy_score(label, y_predicted)
                             test_loss.append(loss.item())
                             print(f"Test Batch {i+1}: Loss = {loss.item()}, Acc = {acc}")
+                            
+                            # Log test batch metrics to Neptune
+                            run["test/batch/loss"].log(loss.item())
+                            run["test/batch/accuracy"].log(acc)
+                            
                 # Save the trained model
                 torch.save(model.state_dict(), store_path)
                 print(f"Model saved to {store_path}")
+                
+                # Log model path to Neptune
+                run["model/path"] = store_path
 
     except Exception as e:
         print("An error occurred during training:")
         print(traceback.format_exc())
-                        # print("test:epoch = {:}   Acc= {:.4f}".format((epoch + 1) , (acc)))
-                        # f2.write("{},{:.4f},{:.4f}".format((epoch + 1), (loss.item()), (acc)))  # 写入数据
-                        # f2.write('\n')
-                        # f2.flush()
-            # 将每次测试结果实时写入acc.txt文件中
-
+        run["error"] = traceback.format_exc()
+        
+    finally:
+        run.stop()
 
 
 def modeltest(tp, test_ratio, start, end, ncls, psize, depth, heads, mlp_dim, path):
