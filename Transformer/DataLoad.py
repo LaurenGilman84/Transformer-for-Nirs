@@ -209,8 +209,8 @@ def DataLoad(tp, test_ratio, start, end):
     y_data = np.array(data_y)
     X_train, X_test, y_train, y_test = train_test_split(x_data, y_data, test_size=test_ratio,random_state=random_state)
 
-    print('训练集规模：{}'.format(len(X_train[:,0])))
-    print('测试集规模：{}'.format(len(X_test[:,0])))
+    print('Training Set Size：{}'.format(len(X_train[:,0])))
+    print('Test set Size：{}'.format(len(X_test[:,0])))
 
     #data_train, data_test = ZspPocessnew(X_train, X_test,y_train,y_test,need=True)  #for transformer :false only  used in proseesing comparsion
     #data_train, data_test = ZspPocess(X_train, X_test,y_train,y_test,need=False) #for cnn :false only used in proseesing comparsion
@@ -253,8 +253,8 @@ def TableDataLoad(tp, test_ratio, start, end, seed):
     # X_test_Nom = standscale.transform(X_test)  ##no standard for proseesing comprasion
     # return  X_train_Nom, X_test_Nom, y_train, y_test
 
-    print('训练集规模：{}'.format(len(X_train[:,0])))
-    print('测试集规模：{}'.format(len(X_test[:,0])))
+    print('Training Set Size：{}'.format(len(X_train[:,0])))
+    print('Test set size：{}'.format(len(X_test[:,0])))
 
     data_train, data_test = ZspPocessnew(X_train, X_test,y_train,y_test,need=False)  #for transformer :false only  used in proseesing comparsion
     #data_train, data_test = ZspPocess(X_train, X_test,y_train,y_test,need=True) #for cnn :false only used in proseesing comparsion
@@ -360,8 +360,8 @@ def BaseDataLoad(tp, test_ratio, start, end):
     X_train_Nom = standscale.fit_transform(X_train)
     X_test_Nom = standscale.transform(X_test)  ##no standard for proseesing comprasion
 
-    print('训练集规模：{}'.format(len(X_train[:,0])))
-    print('测试集规模：{}'.format(len(X_test[:,0])))
+    print('Training Set Size：{}'.format(len(X_train[:,0])))
+    print('Test Set Size：{}'.format(len(X_test[:,0])))
 
     return X_train_Nom, X_test_Nom, y_train, y_test
     # return X_train, X_test, y_train, y_test

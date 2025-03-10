@@ -34,18 +34,27 @@ import os
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-def modeltrian(tp, EPOCH, LR, test_ratio, start, end, ncls, psize, depth, heads, mlp_dim, path):
+import os
+import traceback
 
+def modeltrain(tp, EPOCH, LR, test_ratio, start, end, ncls, psize, depth, heads, mlp_dim, path):
     global NetPath
 
+    # Ensure the directory exists for the model path
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+
+    # Ensure the directories exist for the result paths
+    train_result_dir = './/Result//Train'
+    test_result_dir = './/Result//Test'
+    os.makedirs(train_result_dir, exist_ok=True)
+    os.makedirs(test_result_dir, exist_ok=True)
 
     data_train, data_test = TableDataLoad(tp, test_ratio, start, end, seed=80)
     train_loader = torch.utils.data.DataLoader(data_train, batch_size=BATCH_SIZE, shuffle=True)
     test_loader = torch.utils.data.DataLoader(data_test, batch_size=BATCH_SIZE, shuffle=True)
 
-    train_result_path = './/Result//Train//transfomertable.csv'
-    test_result_path = './/Result//Test//transfomertable.csv'
-
+    train_result_path = os.path.join(train_result_dir, 'transfomertable.csv')
+    test_result_path = os.path.join(test_result_dir, 'transfomertable.csv')
 
     store_path = path
 
@@ -61,8 +70,6 @@ def modeltrian(tp, EPOCH, LR, test_ratio, start, end, ncls, psize, depth, heads,
                     emb_dropout = 0.1
                     ).to(device)
 
-    # summary(model, (1, 2000, 1), batch_size=1, device="cuda")
-
     criterion = nn.CrossEntropyLoss().to(device)  # 损失函数为焦损函数，多用于类别不平衡的多分类问题
 
     optimizer = optim.Adam(model.parameters(), lr=LR)  # 优化方式为mini-batch momentum-SGD，并采用L2正则化（权重衰减）
@@ -71,50 +78,58 @@ def modeltrian(tp, EPOCH, LR, test_ratio, start, end, ncls, psize, depth, heads,
                                                            patience=10)
     print("This is VitRun")
     print("Start Training!")  # 定义遍历数据集的次数
-    with open(train_result_path, "w") as f1:
-        with open(test_result_path, "w") as f2:
-            f1.write("{},{},{}".format(("epoch"), ("loss"), ("acc")))  # 写入数据
-            f1.write('\n')
-            f2.write("{},{},{}".format(("epoch"), ("loss"), ("acc")))  # 写入数据
-            f2.write('\n')
-            for epoch in range(EPOCH):
-                for i, data in enumerate(train_loader):  # gives batch data, normalize x when iterate train_loader
+
+    try:
+        with open(train_result_path, "w") as f1:
+            with open(test_result_path, "w") as f2:
+                f1.write("{},{},{}".format(("epoch"), ("loss"), ("acc")))  # 写入数据
+                f1.write('\n')
+                f2.write("{},{},{}".format(("epoch"), ("loss"), ("acc")))  # 写入数据
+                f2.write('\n')
+                for epoch in range(EPOCH):
+                    print(f"Epoch {epoch+1}/{EPOCH}")
                     sum_loss = []
-                    model.train()  # 不训练
-                    inputs, labels = data  # 输入和标签都等于data
-                    inputs = Variable(inputs).type(torch.FloatTensor).to(device)  # batch x
-                    labels = Variable(labels).type(torch.LongTensor).to(device)  # batch y
-                    output = model(inputs)  # cnn output
-                    loss = criterion(output, labels)  # cross entropy loss
-                    optimizer.zero_grad()  # clear gradients for this training step
-                    loss.backward()  # backpropagation, compute gradients
-                    optimizer.step()  # apply gradients
-                    _, predicted = torch.max(output.data,1)  # _ , predicted这样的赋值语句，表示忽略第一个返回值，把它赋值给 _， 就是舍弃它的意思，预测值＝output的第一个维度
-                    y_predicted = predicted.cpu().numpy()
-                    label = labels.cpu().numpy()
-                    acc = accuracy_score(label, y_predicted)
-                    # print("trian:epoch = {:} Loss = {:.4f}  Acc= {:.4f}".format((epoch + 1), (loss.item()),(acc)))  # 训练次数，总损失，精确度
-                    # f1.write("{:},{:.4f},{:.4f}".format((epoch + 1), (loss.item()), (acc)))  # 写入数据
-                    # f1.write('\n')
-                    # f1.flush()
-                    sum_loss.append(loss.item())
-                avg_loss = np.mean(sum_loss)
-
-
-                with torch.no_grad():  # 无梯度
-                    test_loss = []
-                    for i, data in enumerate(test_loader):
-                        model.eval()  # 不训练
+                    for i, data in enumerate(train_loader):  # gives batch data, normalize x when iterate train_loader
+                        model.train()  # 不训练
                         inputs, labels = data  # 输入和标签都等于data
                         inputs = Variable(inputs).type(torch.FloatTensor).to(device)  # batch x
                         labels = Variable(labels).type(torch.LongTensor).to(device)  # batch y
-                        outputs = model(inputs)  # 输出等于进入网络后的输入
-                        loss = criterion(outputs, labels)  # cross entropy loss
-                        _, predicted = torch.max(outputs.data,1)  # _ , predicted这样的赋值语句，表示忽略第一个返回值，把它赋值给 _， 就是舍弃它的意思，预测值＝output的第一个维度 ，取得分最高的那个类 (outputs.data的索引号)
+                        output = model(inputs)  # cnn output
+                        loss = criterion(output, labels)  # cross entropy loss
+                        optimizer.zero_grad()  # clear gradients for this training step
+                        loss.backward()  # backpropagation, compute gradients
+                        optimizer.step()  # apply gradients
+                        _, predicted = torch.max(output.data,1)  # _ , predicted这样的赋值语句，表示忽略第一个返回值，把它赋值给 _， 就是舍弃它的意思，预测值＝output的第一个维度
                         y_predicted = predicted.cpu().numpy()
                         label = labels.cpu().numpy()
                         acc = accuracy_score(label, y_predicted)
-                        test_loss.append(loss.item())
+                        print(f"Batch {i+1}: Loss = {loss.item()}, Acc = {acc}")
+                        sum_loss.append(loss.item())
+                    avg_loss = np.mean(sum_loss)
+                    print(f"Epoch {epoch+1} completed. Avg Loss = {avg_loss}")
+
+                    with torch.no_grad():  # 无梯度
+                        test_loss = []
+                        for i, data in enumerate(test_loader):
+                            model.eval()  # 不训练
+                            inputs, labels = data  # 输入和标签都等于data
+                            inputs = Variable(inputs).type(torch.FloatTensor).to(device)  # batch x
+                            labels = Variable(labels).type(torch.LongTensor).to(device)  # batch y
+                            outputs = model(inputs)  # 输出等于进入网络后的输入
+                            loss = criterion(outputs, labels)  # cross entropy loss
+                            _, predicted = torch.max(outputs.data,1)  # _ , predicted这样的赋值语句，表示忽略第一个返回值，把它赋值给 _， 就是舍弃它的意思，预测值＝output的第一个维度 ，取得分最高的那个类 (outputs.data的索引号)
+                            y_predicted = predicted.cpu().numpy()
+                            label = labels.cpu().numpy()
+                            acc = accuracy_score(label, y_predicted)
+                            test_loss.append(loss.item())
+                            print(f"Test Batch {i+1}: Loss = {loss.item()}, Acc = {acc}")
+                # Save the trained model
+                torch.save(model.state_dict(), store_path)
+                print(f"Model saved to {store_path}")
+
+    except Exception as e:
+        print("An error occurred during training:")
+        print(traceback.format_exc())
                         # print("test:epoch = {:}   Acc= {:.4f}".format((epoch + 1) , (acc)))
                         # f2.write("{},{:.4f},{:.4f}".format((epoch + 1), (loss.item()), (acc)))  # 写入数据
                         # f2.write('\n')
@@ -302,18 +317,32 @@ if __name__ == "__main__":
 
     name = 'raw'
 
-    sotre_path = './/model//Table//transformertable1125'+'{}.pt'.format(name)
+    store_path = './/model//Table//transformertable1125'+'{}.pt'.format(name)
 
-    # modeltrian(tp=name, EPOCH=200, LR=0.0001, test_ratio=0.319,
-    #                               start=0, end=400, ncls=4, psize=10, depth=3, heads=12, mlp_dim=1024,
-    #                               path=sotre_path)  # depth=6, heads=10, 12, 14
-    acc, precis, reca, F1, roc_auc = model4AUCtest(tp=name,test_ratio=0.319,
-               start=0, end=400, ncls=4, psize=10, depth=3, heads=12, mlp_dim=1024, path=sotre_path)  # depth=6, heads=10, 12, 14
+    modeltrain(tp=name, EPOCH=200, LR=0.0001, test_ratio=0.319,
+                                   start=0, end=400, ncls=4, psize=10, depth=3, heads=12, mlp_dim=1024,
+                                   path=store_path)  # depth=6, heads=10, 12, 14
+    
+    # Test the model
+    acc = modeltest(tp=name, test_ratio=0.319, start=0, end=400,
+                    ncls=4, psize=10, depth=3, heads=12, mlp_dim=1024, path=store_path)
+    print(f"Test Accuracy: {acc}")
 
-    print("acc:{}, precis:{}, recall:{}, F1:{}, auc:{}".format(acc, precis, reca, F1, roc_auc))
+    # Optionally, you can also use model4AUCtest to get more metrics
+    acc, precis, reca, F1, roc_auc = model4AUCtest(tp=name, test_ratio=0.319,
+                                                   start=0, end=400, ncls=4, psize=10, depth=3, heads=12, mlp_dim=1024, path=store_path)
+    print(f"Accuracy: {acc}, Precision: {precis}, Recall: {reca}, F1 Score: {F1}, AUC: {roc_auc}")
+
+
+
+
+    #acc, precis, reca, F1, roc_auc = model4AUCtest(tp=name,test_ratio=0.319,
+    #           start=0, end=400, ncls=4, psize=10, depth=3, heads=12, mlp_dim=1024, path=store_path)  # depth=6, heads=10, 12, 14
+
+    #print("acc:{}, precis:{}, recall:{}, F1:{}, auc:{}".format(acc, precis, reca, F1, roc_auc))
 
     #     acc = modeltest(tp=name, test_ratio=0.319, start=0, end=400,
-    #                            ncls=4, psize=10, depth=3, heads=12, mlp_dim=1024, path=sotre_path)
+    #                            ncls=4, psize=10, depth=3, heads=12, mlp_dim=1024, path=store_path)
     #     print(acc)
     #     # print(arry)
     #     # with open(result_path, "a") as file:
@@ -324,15 +353,15 @@ if __name__ == "__main__":
     # list = [5,10,25,40,50,80,100]
     #
     # for name in list:
-    #     sotre_path = './/model//Table//transformertable'+'{}.pt'.format(name)
+    #     store_path = './/model//Table//transformertable'+'{}.pt'.format(name)
     #
     #
     #     result_path = './/Result//Table//transformertabale'+'.csv'
-    #     modeltrian(tp='raw', EPOCH=200, LR=0.0001, test_ratio=0.319,
+    #     modeltrain(tp='raw', EPOCH=200, LR=0.0001, test_ratio=0.319,
     #                                   start=0, end=400, ncls=4, psize=name, depth=3, heads=12, mlp_dim=12,
-    #                                   path=sotre_path)  # depth=6, heads=10, 12, 14
+    #                                   path=store_path)  # depth=6, heads=10, 12, 14
     #     acc = modeltest(tp='raw', test_ratio=0.319, start=0, end=400,
-    #                            ncls=4, psize=name, depth=3, heads=12, mlp_dim=12, path=sotre_path)
+    #                            ncls=4, psize=name, depth=3, heads=12, mlp_dim=12, path=store_path)
     #     print(acc)
     #
     #     with open(result_path, "a") as file:
